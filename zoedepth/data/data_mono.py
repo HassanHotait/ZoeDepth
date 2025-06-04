@@ -349,10 +349,14 @@ class DataLoadPreprocess(Dataset):
 
             image = np.asarray(image, dtype=np.float32) / 255.0
             depth_gt = np.asarray(depth_gt, dtype=np.float32)
+            if depth_gt.ndim == 3:
+                depth_gt = np.mean(depth_gt, axis=2)  # Take mean if depth is RGB
             depth_gt = np.expand_dims(depth_gt, axis=2)
 
             if self.config.dataset == 'nyu':
                 depth_gt = depth_gt / 1000.0
+            elif self.config.dataset == 'prescan':
+                depth_gt = (depth_gt / 255) * 100
             else:
                 depth_gt = depth_gt / 256.0
 
@@ -548,7 +552,9 @@ class ToTensor(object):
     def to_tensor(self, pic):
         if not (_is_pil_image(pic) or _is_numpy_image(pic)):
             raise TypeError(
-                'pic should be PIL Image or ndarray. Got {}'.format(type(pic)))
+                f"Expected a PIL Image or NumPy ndarray with 2 or 3 dimensions. "
+    f"Got type: {type(pic)}, ndim: {getattr(pic, 'ndim', 'N/A')}"
+)
 
         if isinstance(pic, np.ndarray):
             img = torch.from_numpy(pic.transpose((2, 0, 1)))

@@ -29,3 +29,9 @@ python evaluate.py -m zoedepth_nk --pretrained_resource="local::path/to/ckpt" -d
 |-------|-------|-------|---------|------|--------|-----------|--------|--------|
 | 0.264 | 0.562 | 0.764 | 0.353   | 0.9  | 0.207  | 0.59      | 38.794 | 0.342  |
 
+
+# Training on vKITTI2
+
+When we train we dont start from random weights, we start from  'https://github.com/isl-org/ZoeDepth/releases/download/v1.0/ZoeD_M12_NK.pt"
+
+python train_mono.py -m zoedepth_nk -d vkitti2 --pretrained_resource="url::https://github.com/isl-org/ZoeDepth/releases/download/v1.0/ZoeD_M12_NK.pt"

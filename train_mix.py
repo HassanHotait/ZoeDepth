@@ -36,7 +36,7 @@ from pprint import pprint
 import argparse
 import os
 
-os.environ["PYOPENGL_PLATFORM"] = "egl"
+os.environ["PYOPENGL_PLATFORM"] = "windows"
 os.environ["WANDB_START_METHOD"] = "thread"
 
 
@@ -94,7 +94,7 @@ def main_worker(gpu, ngpus_per_node, config):
 
         model = build_model(config)
         model = load_ckpt(config, model)
-        model = parallelize(config, model)
+        # model = parallelize(config, model)
 
         total_params = f"{round(count_parameters(model)/1e6,2)}M"
         config.total_params = total_params
@@ -113,7 +113,7 @@ def main_worker(gpu, ngpus_per_node, config):
 
 
 if __name__ == '__main__':
-    mp.set_start_method('forkserver')
+    mp.set_start_method('spawn', force=True)  # changed from 'forkserver'
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model", type=str, default="synunet")
@@ -140,20 +140,10 @@ if __name__ == '__main__':
     if config.root != "." and not os.path.isdir(config.root):
         os.makedirs(config.root)
 
-    try:
-        node_str = os.environ['SLURM_JOB_NODELIST'].replace(
-            '[', '').replace(']', '')
-        nodes = node_str.split(',')
+    config.world_size = 1
+    config.rank = 0
 
-        config.world_size = len(nodes)
-        config.rank = int(os.environ['SLURM_PROCID'])
-        # config.save_dir = "/ibex/scratch/bhatsf/videodepth/checkpoints"
-
-    except KeyError as e:
-        # We are NOT using SLURM
-        config.world_size = 1
-        config.rank = 0
-        nodes = ["127.0.0.1"]
+    nodes = ["127.0.0.1"]
 
     if config.distributed:
 
@@ -169,11 +159,5 @@ if __name__ == '__main__':
     config.ngpus_per_node = ngpus_per_node
     print("Config:")
     pprint(config)
-    if config.distributed:
-        config.world_size = ngpus_per_node * config.world_size
-        mp.spawn(main_worker, nprocs=ngpus_per_node,
-                 args=(ngpus_per_node, config))
-    else:
-        if ngpus_per_node == 1:
-            config.gpu = 0
-        main_worker(config.gpu, ngpus_per_node, config)
+    config.gpu = 0
+    main_worker(config.gpu, 1, config)
