@@ -166,6 +166,7 @@ class DepthDataLoader(object):
                                    num_workers=1,
                                    pin_memory=False,
                                    sampler=self.eval_sampler)
+            pass
 
         elif mode == 'test':
             self.testing_samples = DataLoadPreprocess(
@@ -394,9 +395,13 @@ class DataLoadPreprocess(Dataset):
 
                 if has_valid_depth:
                     depth_gt = np.asarray(depth_gt, dtype=np.float32)
+                    if depth_gt.ndim == 3:
+                        depth_gt = np.mean(depth_gt, axis=2)  # Take mean if depth is RGB
                     depth_gt = np.expand_dims(depth_gt, axis=2)
                     if self.config.dataset == 'nyu':
                         depth_gt = depth_gt / 1000.0
+                    elif self.config.dataset == 'prescan':
+                        depth_gt = (depth_gt / 255) * 100
                     else:
                         depth_gt = depth_gt / 256.0
 
