@@ -23,11 +23,14 @@
 # File author: Shariq Farooq Bhat
 
 import argparse
+import os
 from pprint import pprint
 
 import torch
 from zoedepth.utils.easydict import EasyDict as edict
 from tqdm import tqdm
+from datetime import datetime
+import numpy as np
 
 from zoedepth.data.data_mono import DepthDataLoader
 from zoedepth.models.builder import build_model
@@ -78,10 +81,10 @@ def evaluate(model, test_loader, config, round_vals=True, round_precision=3):
         focal = sample.get('focal', torch.Tensor(
             [715.0873]).cuda())  # This magic number (focal) is only used for evaluating BTS model
         pred = infer(model, image, dataset=sample['dataset'][0], focal=focal)
+        np.save(os.path.join(config.save_preds, f"{str(i).zfill(6)}.npy"), pred.cpu().numpy())  # Save pred as numpy array
 
         # Save image, depth, pred for visualization
         if "save_images" in config and config.save_images:
-            import os
             # print("Saving images ...")
             from PIL import Image
             import torchvision.transforms as transforms
@@ -121,13 +124,20 @@ def main(config):
     return metrics
 
 
-def eval_model(model_name, pretrained_resource, dataset='nyu', **kwargs):
+def eval_model(model_name, pretrained_resource, dataset='nyu',save_preds=False,**kwargs):
 
     # Load default pretrained resource defined in config if not set
     overwrite = {**kwargs, "pretrained_resource": pretrained_resource} if pretrained_resource else kwargs
     config = get_config(model_name, "eval", dataset, **overwrite)
     # config = change_dataset(config, dataset)  # change the dataset
     pprint(config)
+    if save_preds:
+        now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        config.save_preds = os.path.join(config.data_path, "..",f"preds_{now_str}")
+        print(f'Data path: {config.data_path}')
+        print(f"Saving predicted depth maps and input images to {config.save_preds}")
+        os.makedirs(config.save_preds)
+        
     print(f"Evaluating {model_name} on {dataset}...")
     metrics = main(config)
     return metrics
@@ -141,6 +151,8 @@ if __name__ == '__main__':
                         required=False, default=None, help="Pretrained resource to use for fetching weights. If not set, default resource from model config is used,  Refer models.model_io.load_state_from_resource for more details.")
     parser.add_argument("-d", "--dataset", type=str, required=False,
                         default='nyu', help="Dataset to evaluate on")
+    parser.add_argument("--save_preds", action="store_true",
+                        help="If set, saves predicted depth maps during evaluation")
 
     args, unknown_args = parser.parse_known_args()
     overwrite_kwargs = parse_unknown(unknown_args)
@@ -158,4 +170,4 @@ if __name__ == '__main__':
     
     for dataset in datasets:
         eval_model(args.model, pretrained_resource=args.pretrained_resource,
-                    dataset=dataset, **overwrite_kwargs)
+                    dataset=dataset,save_preds=args.save_preds, **overwrite_kwargs)
