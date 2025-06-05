@@ -95,16 +95,13 @@ DATASETS_CONFIG = {
         "dataset": "kitti",
         "min_depth": 0.001,
         "max_depth": 80,
-        "data_path": os.path.join(
-            HOME_DIR,
-            r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\postProcessedData\data_5",
-        ),
+        "data_path": r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\postProcessedData\data_5",
         "gt_path": r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\data_5\depthMap",  # os.path.join(HOME_DIR, "Kitti/data_depth_annotated_zoedepth"),
-        "filenames_file": r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\data_5\train_test_inputs\test.txt",
+        "filenames_file": r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\data_5\train_test_inputs\train.txt",
         "input_height": 1200,
         "input_width": 1920,
-        "data_path_eval": r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\data_5\train_test_inputs\test.txt",
-        "gt_path_eval": r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\data_5\train_test_inputs\test.txt",
+        "data_path_eval":  r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\postProcessedData\data_5",
+        "gt_path_eval": r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\data_5\depthMap",
         "filenames_file_eval": r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\data_5\train_test_inputs\test.txt",
         "min_depth_eval": 1e-3,
         "max_depth_eval": 80,
@@ -257,7 +254,7 @@ ALL_EVAL_DATASETS = ALL_INDOOR + ALL_OUTDOOR
 
 COMMON_TRAINING_CONFIG = {
     "dataset": "nyu",
-    "distributed": True,
+    "distributed": False,
     "workers": 16,
     "clip_grad": 0.1,
     "use_shared_dict": False,
@@ -270,8 +267,8 @@ COMMON_TRAINING_CONFIG = {
     "translate_prob": 0.2,
     "max_translation": 100,
 
-    "validate_every": 0.25,
-    "log_images_every": 0.1,
+    "validate_every": 1,
+    "log_images_every": 1,
     "prefetch": False,
 }
 
@@ -397,7 +394,7 @@ def get_config(model_name, mode='train', dataset=None, **overwrite_kwargs):
     check_choices("Model", model_name, ["zoedepth", "zoedepth_nk"])
     check_choices("Mode", mode, ["train", "infer", "eval"])
     if mode == "train":
-        check_choices("Dataset", dataset, ["nyu", "kitti", "mix", None])
+        check_choices("Dataset", dataset, ["nyu", "kitti", "mix", "prescan",None])
 
     config = flatten({**COMMON_CONFIG, **COMMON_TRAINING_CONFIG})
     config = update_model_config(config, mode, model_name)
