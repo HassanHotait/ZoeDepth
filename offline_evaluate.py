@@ -30,6 +30,7 @@ import torch
 from zoedepth.utils.easydict import EasyDict as edict
 from tqdm import tqdm
 import numpy as np
+import rerun as rr
 
 from zoedepth.data.data_mono import DepthDataLoader
 from zoedepth.models.builder import build_model
@@ -37,6 +38,7 @@ from zoedepth.utils.arg_utils import parse_unknown
 from zoedepth.utils.config import change_dataset, get_config, ALL_EVAL_DATASETS, ALL_INDOOR, ALL_OUTDOOR
 from zoedepth.utils.misc import (Metrics,RunningAverageDict, colors, compute_metrics,
                         count_parameters)
+from zoedepth.utils.viz import rerun_log
 
 
 @torch.no_grad()
@@ -83,6 +85,9 @@ def evaluate_offline(pred_dir, test_loader, config, round_vals=True, round_preci
         pred = torch.from_numpy(np.load(pred_path)).cuda()
         metrics['pixel'].update(compute_metrics(depth, pred, config=config))
 
+        if config.rerun_init:
+            rerun_log(i,depth,pred,sample)
+
     if round_vals:
         def r(m): return round(m, round_precision)
     else:
@@ -101,12 +106,14 @@ def main(config):
     return metrics
 
 
-def eval_offline(model_name, pred_dir,pretrained_resource, dataset='nyu', **kwargs):
+def eval_offline(model_name, pred_dir,rerun_init,pretrained_resource=None, dataset='nyu',**kwargs):
 
     # Load default pretrained resource defined in config if not set
     overwrite = {**kwargs, "pretrained_resource": pretrained_resource} if pretrained_resource else kwargs
     config = get_config(model_name, "eval", dataset, **overwrite)
     config.pred_dir = pred_dir  # Set the prediction directory
+    if rerun_init:
+        config.rerun_init = True  # Initialize Rerun if specified
     # config = change_dataset(config, dataset)  # change the dataset
     pprint(config)
     print(f"Evaluating {model_name} on {dataset}...")
@@ -121,6 +128,7 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--dataset", type=str, required=False,
                         default='nyu', help="Dataset to evaluate on")
     parser.add_argument("--pred_dir", type=str, required=True, help="Directory containing predicted depth .npy files")
+    parser.add_argument("--rerun_viz", action="store_true", default=True, help="Whether to rerun visualization (default: True)")
 
     args, unknown_args = parser.parse_known_args()
     overwrite_kwargs = parse_unknown(unknown_args)
@@ -135,7 +143,13 @@ if __name__ == '__main__':
         datasets = args.dataset.split(",")
     else:
         datasets = [args.dataset]
+
+    if args.rerun_viz:
+        rr.init("Depth Eval Viz",spawn=True)
+        rerun_init = True
+    else:
+        rerun_init = False
     
     for dataset in datasets:
-        eval_offline(args.model, args.pred_dir,pretrained_resource=None,
+        eval_offline(args.model, args.pred_dir, rerun_init,pretrained_resource=None,
                     dataset=dataset, **overwrite_kwargs)
