@@ -22,7 +22,7 @@ python evaluate.py -m zoedepth_nk -d prescan
 # Evaluate on Prescan with Custom Weights
 
 ```bash
-python evaluate.py -m zoedepth_nk --pretrained_resource="local::C:\Users\Hasan\shortcuts\monodepth3_checkpoints\ZoeDepthNKv1_05-Jun_20-28-f7aa0db17ecb_best.pt" -d prescan
+python online_evaluate.py -m zoedepth_nk --pretrained_resource="local::C:\Users\Hasan\shortcuts\monodepth3_checkpoints\ZoeDepthNKv1_05-Jun_20-28-f7aa0db17ecb_best.pt" -d prescan --save_preds
 ```
 
 | a1    | a2    | a3    | abs_rel | rmse | log_10 | rmse_log | silog  | sq_rel |

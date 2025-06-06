@@ -81,23 +81,22 @@ def evaluate(model, test_loader, config, round_vals=True, round_precision=3):
         focal = sample.get('focal', torch.Tensor(
             [715.0873]).cuda())  # This magic number (focal) is only used for evaluating BTS model
         pred = infer(model, image, dataset=sample['dataset'][0], focal=focal)
-        np.save(os.path.join(config.save_preds, f"{str(i).zfill(6)}.npy"), pred.cpu().numpy())  # Save pred as numpy array
+        
 
         # Save image, depth, pred for visualization
-        if "save_images" in config and config.save_images:
+        if config.save_preds_arrays or config.save_preds_images:
             # print("Saving images ...")
+            np.save(os.path.join(config.save_preds_arrays, f"{str(i).zfill(6)}.npy"), pred.cpu().numpy())  # Save pred as numpy array
             from PIL import Image
             import torchvision.transforms as transforms
             from zoedepth.utils.misc import colorize
 
-            os.makedirs(config.save_images, exist_ok=True)
             # def save_image(img, path):
             d = colorize(depth.squeeze().cpu().numpy(), 0, 10)
-            p = colorize(pred.squeeze().cpu().numpy(), 0, 10)
-            im = transforms.ToPILImage()(image.squeeze().cpu())
-            im.save(os.path.join(config.save_images, f"{i}_img.png"))
-            Image.fromarray(d).save(os.path.join(config.save_images, f"{i}_depth.png"))
-            Image.fromarray(p).save(os.path.join(config.save_images, f"{i}_pred.png"))
+            # p = colorize(pred.squeeze().cpu().numpy(), 0, 10)
+            # im = transforms.ToPILImage()(image.squeeze().cpu())
+            Image.fromarray(d).save(os.path.join(config.save_preds_images, f"{str(i).zfill(6)}.png"))
+            # Image.fromarray(p).save(os.path.join(config.save_images, f"{i}_pred.png"))
 
 
 
@@ -133,10 +132,10 @@ def eval_model(model_name, pretrained_resource, dataset='nyu',save_preds=False,*
     pprint(config)
     if save_preds:
         now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        config.save_preds = os.path.join(config.data_path, "..",f"preds_{now_str}")
-        print(f'Data path: {config.data_path}')
-        print(f"Saving predicted depth maps and input images to {config.save_preds}")
-        os.makedirs(config.save_preds)
+        config.save_preds_arrays = os.path.join(config.data_path, "..","arrays",f"preds_{now_str}")
+        config.save_preds_images = os.path.join(config.data_path, "..","images",f"preds_{now_str}")
+        os.makedirs(config.save_preds_arrays)
+        os.makedirs(config.save_preds_images)
         
     print(f"Evaluating {model_name} on {dataset}...")
     metrics = main(config)
