@@ -101,7 +101,7 @@ def evaluate(model, test_loader, config, round_vals=True, round_precision=3):
 
 
         # print(depth.shape, pred.shape)
-        print(f'Gt Depth shape: {depth.shape}, Pred Depth shape: {pred.shape}')
+        # print(f'Gt Depth shape: {depth.shape}, Pred Depth shape: {pred.shape}')
         metrics.update(compute_metrics(depth, pred, config=config))
 
     if round_vals:

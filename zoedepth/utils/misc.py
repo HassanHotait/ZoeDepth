@@ -92,6 +92,33 @@ class RunningAverageDict:
         if self._dict is None:
             return None
         return {key: value.get_value() for key, value in self._dict.items()}
+    
+class Metrics:
+    def __init__(self):
+        self._metrics = {}
+
+    def __getitem__(self, key):
+        if key not in self._metrics:
+            self._metrics[key] = RunningAverageDict()
+        return self._metrics[key]
+
+    def __setitem__(self, key, value):
+        if not isinstance(value, RunningAverageDict):
+            raise TypeError(f"Expected RunningAverageDict, got {type(value)}")
+        self._metrics[key] = value
+
+    def get_all_values(self):
+        return {key: rad.get_value() for key, rad in self._metrics.items()}
+
+    def to_dict(self, round_vals=True, round_precision=3):
+        r = (lambda m: round(m, round_precision)) if round_vals else (lambda m: m)
+        return {
+            key: {k: r(v) for k, v in rad.get_value().items()}
+            for key, rad in self._metrics.items()
+        }
+
+    def __repr__(self):
+        return repr(self.to_dict())
 
 
 def colorize(value, vmin=None, vmax=None, cmap='gray_r', invalid_val=-99, invalid_mask=None, background_color=(128, 128, 128, 255), gamma_corrected=False, value_transform=None):

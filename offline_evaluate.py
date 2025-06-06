@@ -35,7 +35,7 @@ from zoedepth.data.data_mono import DepthDataLoader
 from zoedepth.models.builder import build_model
 from zoedepth.utils.arg_utils import parse_unknown
 from zoedepth.utils.config import change_dataset, get_config, ALL_EVAL_DATASETS, ALL_INDOOR, ALL_OUTDOOR
-from zoedepth.utils.misc import (RunningAverageDict, colors, compute_metrics,
+from zoedepth.utils.misc import (Metrics,RunningAverageDict, colors, compute_metrics,
                         count_parameters)
 
 
@@ -67,7 +67,7 @@ def infer(model, images, **kwargs):
 
 
 def evaluate_offline(pred_dir, test_loader, config, round_vals=True, round_precision=3):
-    metrics = RunningAverageDict()
+    metrics = Metrics()
     for i, sample in tqdm(enumerate(test_loader), total=len(test_loader)):
         if 'has_valid_depth' in sample:
             if not sample['has_valid_depth']:
@@ -85,24 +85,26 @@ def evaluate_offline(pred_dir, test_loader, config, round_vals=True, round_preci
 
 
         # print(depth.shape, pred.shape)
-        print(f'Gt Depth shape: {depth.shape}, Pred Depth shape: {pred.shape}')
-        metrics.update(compute_metrics(depth, pred, config=config))
+        # print(f'Gt Depth shape: {depth.shape}, Pred Depth shape: {pred.shape}')
+        metrics['pixel'].update(compute_metrics(depth, pred, config=config))
 
     if round_vals:
         def r(m): return round(m, round_precision)
     else:
         def r(m): return m
-    metrics = {k: r(v) for k, v in metrics.get_value().items()}
+
+    # pixel_metrics= {k: r(v) for k, v in metrics['pixel'].get_value().items()}
+    # metrics['pixel'] = pixel_metrics
     return metrics
 
 def main(config):
-    model = build_model(config=config) # Only for completeness, not used in offline evaluation
+    # model = build_model(config=config) # Only for completeness, not used in offline evaluation
     test_loader = DepthDataLoader(config, 'online_eval').data
     metrics = evaluate_offline(config.pred_dir, test_loader, config)
     print(f"{colors.fg.green}")
     print(metrics)
     print(f"{colors.reset}")
-    metrics['#params'] = f"{round(count_parameters(model, include_all=True)/1e6, 2)}M"
+    # metrics['pixel']['#params'] = f"{round(count_parameters(model, include_all=True)/1e6, 2)}M"
     return metrics
 
 
