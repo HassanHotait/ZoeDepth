@@ -72,6 +72,7 @@ def evaluate_offline(pred_dir, test_loader, config, round_vals=True, round_preci
         if 'has_valid_depth' in sample:
             if not sample['has_valid_depth']:
                 continue
+
         image, depth = sample['image'], sample['depth']
         image, depth = image.cuda(), depth.cuda()
         depth = depth.squeeze().unsqueeze(0).unsqueeze(0)
@@ -80,12 +81,6 @@ def evaluate_offline(pred_dir, test_loader, config, round_vals=True, round_preci
             print(f"Missing prediction: {pred_path}")
             continue
         pred = torch.from_numpy(np.load(pred_path)).cuda()
-
-
-
-
-        # print(depth.shape, pred.shape)
-        # print(f'Gt Depth shape: {depth.shape}, Pred Depth shape: {pred.shape}')
         metrics['pixel'].update(compute_metrics(depth, pred, config=config))
 
     if round_vals:
@@ -93,13 +88,11 @@ def evaluate_offline(pred_dir, test_loader, config, round_vals=True, round_preci
     else:
         def r(m): return m
 
-    # pixel_metrics= {k: r(v) for k, v in metrics['pixel'].get_value().items()}
-    # metrics['pixel'] = pixel_metrics
     return metrics
 
 def main(config):
     # model = build_model(config=config) # Only for completeness, not used in offline evaluation
-    test_loader = DepthDataLoader(config, 'online_eval').data
+    test_loader = DepthDataLoader(config, 'offline_eval').data
     metrics = evaluate_offline(config.pred_dir, test_loader, config)
     print(f"{colors.fg.green}")
     print(metrics)

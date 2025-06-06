@@ -43,4 +43,7 @@ python train_mono.py -m zoedepth_nk -d prescan --pretrained_resource="url::https
 # Offline Eval
 
 
-python offline_evaluate.py -m zoedepth_nk -d prescan --pred_dir C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\preds_20250606_201259
+python offline_evaluate.py -m zoedepth_nk -d my_kitti_set --pred_dir C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\preds_20250606_224520
+
+
+C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\preds_20250606_224520

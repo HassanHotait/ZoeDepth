@@ -153,7 +153,7 @@ class DepthDataLoader(object):
                                 #    prefetch_factor=2,
                                    sampler=self.train_sampler)
 
-        elif mode == 'online_eval':
+        elif mode == 'online_eval' or mode == 'offline_eval':
             self.testing_samples = DataLoadPreprocess(
                 config, mode, transform=transform)
             if config.distributed:  # redundant. here only for readability and to be more explicit
@@ -271,7 +271,7 @@ class ImReader:
 class DataLoadPreprocess(Dataset):
     def __init__(self, config, mode, transform=None, is_for_online_eval=False, **kwargs):
         self.config = config
-        if mode == 'online_eval':
+        if mode == 'online_eval' or mode == 'offline_eval':
             with open(config.filenames_file_eval, 'r') as f:
                 self.filenames = f.readlines()
         else:
@@ -293,6 +293,11 @@ class DataLoadPreprocess(Dataset):
     def __getitem__(self, idx):
         sample_path = self.filenames[idx]
         focal = float(sample_path.split()[2])
+        if self.config.dataset == "my_kitti_set":
+            label_id= int(float(sample_path.split()[3]))
+            files = os.listdir(self.config.labels_3d_path)
+            files_path = [os.path.join(self.config.labels_3d_path, f) for f in files if f.endswith('.txt')]
+            label = parse_kitti_label_file(files_path, label_id)
         sample = {}
 
         if self.mode == 'train':
@@ -375,7 +380,7 @@ class DataLoadPreprocess(Dataset):
                       'mask': mask, **sample}
 
         else:
-            if self.mode == 'online_eval':
+            if self.mode == 'online_eval' or self.mode == 'offline_eval':
                 data_path = self.config.data_path_eval
             else:
                 data_path = self.config.data_path
@@ -385,7 +390,7 @@ class DataLoadPreprocess(Dataset):
             image = np.asarray(self.reader.open(image_path),
                                dtype=np.float32) / 255.0
 
-            if self.mode == 'online_eval':
+            if self.mode == 'online_eval' or self.mode == 'offline_eval':
                 gt_path = self.config.gt_path_eval
                 depth_path = os.path.join(
                     gt_path, remove_leading_slash(sample_path.split()[1]))
@@ -421,14 +426,17 @@ class DataLoadPreprocess(Dataset):
                 left_margin = int((width - 1216) / 2)
                 image = image[top_margin:top_margin + 352,
                               left_margin:left_margin + 1216, :]
-                if self.mode == 'online_eval' and has_valid_depth:
+                if self.mode in ['online_eval', 'offline_eval'] and has_valid_depth:
                     depth_gt = depth_gt[top_margin:top_margin +
                                         352, left_margin:left_margin + 1216, :]
 
-            if self.mode == 'online_eval':
+            if self.mode == 'online_eval' or self.mode == 'offline_eval':
                 sample = {'image': image, 'depth': depth_gt, 'focal': focal, 'has_valid_depth': has_valid_depth,
                           'image_path': sample_path.split()[0], 'depth_path': sample_path.split()[1],
                           'mask': mask}
+                
+                if self.config.dataset == "my_kitti_set":
+                    sample['label'] = label
             else:
                 sample = {'image': image, 'focal': focal}
 
@@ -582,3 +590,43 @@ class ToTensor(object):
             return img.float()
         else:
             return img
+
+def parse_kitti_label_file(label_list, idx):
+    """parse label text file into a list of numpy arrays, one for each frame"""
+    f = open(label_list[idx])
+    line_list = []
+    for line in f:
+        line = line.split()
+        line_list.append(line)
+
+    # each line corresponds to one detection
+    det_dict_list = []
+    for line in line_list:
+        # det_dict holds info on one detection
+        det_dict = {}
+        det_dict["class"] = str(line[0])
+        if det_dict["class"] == "DontCare":
+            continue
+        det_dict["truncation"] = float(line[1])
+        det_dict["occlusion"] = int(line[2])
+        det_dict["alpha"] = float(
+            line[3]
+        )  # obs angle relative to straight in front of camera
+        x_min = int(round(float(line[4])))
+        y_min = int(round(float(line[5])))
+        x_max = int(round(float(line[6])))
+        y_max = int(round(float(line[7])))
+        det_dict["bbox2d"] = np.array([x_min, y_min, x_max, y_max])
+        length = float(line[10])
+        width = float(line[9])
+        height = float(line[8])
+        det_dict["dim"] = np.array([length, width, height])
+        x_pos = float(line[11])
+        y_pos = float(line[12])
+        z_pos = float(line[13])
+        det_dict["pos"] = np.array([x_pos, y_pos, z_pos])
+        det_dict["pos_rr"] = np.array([x_pos, z_pos, -y_pos])
+        det_dict["rot_y"] = float(line[14])
+        det_dict_list.append(det_dict)
+
+    return det_dict_list
