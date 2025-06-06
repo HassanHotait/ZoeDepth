@@ -38,3 +38,9 @@ When we train we dont start from random weights, we start from  'https://github.
 python train_mono.py -m zoedepth_nk -d prescan --pretrained_resource="url::https://github.com/isl-org/ZoeDepth/releases/download/v1.0/ZoeD_M12_NK.pt"
 ```
 
+
+
+# Offline Eval
+
+
+python offline_evaluate.py -m zoedepth_nk -d prescan --pred_dir C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\preds_20250606_201259

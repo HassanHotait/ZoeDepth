@@ -24,10 +24,12 @@
 
 import argparse
 from pprint import pprint
+import os
 
 import torch
 from zoedepth.utils.easydict import EasyDict as edict
 from tqdm import tqdm
+import numpy as np
 
 from zoedepth.data.data_mono import DepthDataLoader
 from zoedepth.models.builder import build_model
@@ -64,9 +66,7 @@ def infer(model, images, **kwargs):
     return mean_pred
 
 
-@torch.no_grad()
-def evaluate(model, test_loader, config, round_vals=True, round_precision=3):
-    model.eval()
+def evaluate_offline(pred_dir, test_loader, config, round_vals=True, round_precision=3):
     metrics = RunningAverageDict()
     for i, sample in tqdm(enumerate(test_loader), total=len(test_loader)):
         if 'has_valid_depth' in sample:
@@ -75,27 +75,12 @@ def evaluate(model, test_loader, config, round_vals=True, round_precision=3):
         image, depth = sample['image'], sample['depth']
         image, depth = image.cuda(), depth.cuda()
         depth = depth.squeeze().unsqueeze(0).unsqueeze(0)
-        focal = sample.get('focal', torch.Tensor(
-            [715.0873]).cuda())  # This magic number (focal) is only used for evaluating BTS model
-        pred = infer(model, image, dataset=sample['dataset'][0], focal=focal)
-        
+        pred_path = os.path.join(pred_dir, "arrays",f"{str(i).zfill(6)}.npy")
+        if not os.path.exists(pred_path):
+            print(f"Missing prediction: {pred_path}")
+            continue
+        pred = torch.from_numpy(np.load(pred_path)).cuda()
 
-        # Save image, depth, pred for visualization
-        if "save_images" in config and config.save_images:
-            import os
-            # print("Saving images ...")
-            from PIL import Image
-            import torchvision.transforms as transforms
-            from zoedepth.utils.misc import colorize
-
-            os.makedirs(config.save_images, exist_ok=True)
-            # def save_image(img, path):
-            d = colorize(depth.squeeze().cpu().numpy(), 0, 10)
-            p = colorize(pred.squeeze().cpu().numpy(), 0, 10)
-            im = transforms.ToPILImage()(image.squeeze().cpu())
-            im.save(os.path.join(config.save_images, f"{i}_img.png"))
-            Image.fromarray(d).save(os.path.join(config.save_images, f"{i}_depth.png"))
-            Image.fromarray(p).save(os.path.join(config.save_images, f"{i}_pred.png"))
 
 
 
@@ -111,10 +96,9 @@ def evaluate(model, test_loader, config, round_vals=True, round_precision=3):
     return metrics
 
 def main(config):
-    model = build_model(config)
+    model = build_model(config=config) # Only for completeness, not used in offline evaluation
     test_loader = DepthDataLoader(config, 'online_eval').data
-    model = model.cuda()
-    metrics = evaluate(model, test_loader, config)
+    metrics = evaluate_offline(config.pred_dir, test_loader, config)
     print(f"{colors.fg.green}")
     print(metrics)
     print(f"{colors.reset}")
@@ -122,11 +106,12 @@ def main(config):
     return metrics
 
 
-def eval_model(model_name, pretrained_resource, dataset='nyu', **kwargs):
+def eval_offline(model_name, pred_dir,pretrained_resource, dataset='nyu', **kwargs):
 
     # Load default pretrained resource defined in config if not set
     overwrite = {**kwargs, "pretrained_resource": pretrained_resource} if pretrained_resource else kwargs
     config = get_config(model_name, "eval", dataset, **overwrite)
+    config.pred_dir = pred_dir  # Set the prediction directory
     # config = change_dataset(config, dataset)  # change the dataset
     pprint(config)
     print(f"Evaluating {model_name} on {dataset}...")
@@ -138,10 +123,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model", type=str,
                         required=True, help="Name of the model to evaluate")
-    parser.add_argument("-p", "--pretrained_resource", type=str,
-                        required=False, default=None, help="Pretrained resource to use for fetching weights. If not set, default resource from model config is used,  Refer models.model_io.load_state_from_resource for more details.")
     parser.add_argument("-d", "--dataset", type=str, required=False,
                         default='nyu', help="Dataset to evaluate on")
+    parser.add_argument("--pred_dir", type=str, required=True, help="Directory containing predicted depth .npy files")
 
     args, unknown_args = parser.parse_known_args()
     overwrite_kwargs = parse_unknown(unknown_args)
@@ -158,5 +142,5 @@ if __name__ == '__main__':
         datasets = [args.dataset]
     
     for dataset in datasets:
-        eval_model(args.model, pretrained_resource=args.pretrained_resource,
+        eval_offline(args.model, args.pred_dir,pretrained_resource=None,
                     dataset=dataset, **overwrite_kwargs)

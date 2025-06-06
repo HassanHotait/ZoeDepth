@@ -132,8 +132,8 @@ def eval_model(model_name, pretrained_resource, dataset='nyu',save_preds=False,*
     pprint(config)
     if save_preds:
         now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        config.save_preds_arrays = os.path.join(config.data_path, "..","arrays",f"preds_{now_str}")
-        config.save_preds_images = os.path.join(config.data_path, "..","images",f"preds_{now_str}")
+        config.save_preds_arrays = os.path.join(config.data_path, "..",f"preds_{now_str}","arrays")
+        config.save_preds_images = os.path.join(config.data_path, "..",f"preds_{now_str}","images")
         os.makedirs(config.save_preds_arrays)
         os.makedirs(config.save_preds_images)
         
