@@ -84,6 +84,7 @@ def evaluate_offline(pred_dir, test_loader, config, round_vals=True, round_preci
             continue
         pred = torch.from_numpy(np.load(pred_path)).cuda()
         metrics['pixel'].update(compute_metrics(depth, pred, config=config))
+        metrics['object'].update(compute_metrics(depth, pred, config=config))
 
         if config.rerun_init:
             rerun_log(i,depth,pred,sample)

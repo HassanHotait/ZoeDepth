@@ -126,6 +126,7 @@ class DepthDataLoader(object):
             return
 
         img_size = self.config.get("img_size", None)
+        print(f"Using img_size: {img_size}")
         img_size = img_size if self.config.get(
             "do_input_resize", False) else None
 
@@ -295,9 +296,13 @@ class DataLoadPreprocess(Dataset):
         focal = float(sample_path.split()[2])
         if self.config.dataset == "my_kitti_set":
             label_id= int(float(sample_path.split()[3]))
+            files_calib = os.listdir(os.path.join(self.config.labels_3d_path, '..','calib'))
+            files_calib_path = [os.path.join(os.path.join(self.config.labels_3d_path, '..', 'calib'), f) for f in files_calib if f.endswith('.txt')]
+            calib = parse_kitti_calibration_file(files_calib_path[label_id], raw=False)
             files = os.listdir(self.config.labels_3d_path)
             files_path = [os.path.join(self.config.labels_3d_path, f) for f in files if f.endswith('.txt')]
-            label = parse_kitti_label_file(files_path, label_id)
+            label = parse_kitti_label_file(files_path, label_id,calib=calib)
+
         sample = {}
 
         if self.mode == 'train':
@@ -389,7 +394,6 @@ class DataLoadPreprocess(Dataset):
                 data_path, remove_leading_slash(sample_path.split()[0]))
             image = np.asarray(self.reader.open(image_path),
                                dtype=np.float32) / 255.0
-
             if self.mode == 'online_eval' or self.mode == 'offline_eval':
                 gt_path = self.config.gt_path_eval
                 depth_path = os.path.join(
@@ -437,6 +441,7 @@ class DataLoadPreprocess(Dataset):
                 
                 if self.config.dataset == "my_kitti_set":
                     sample['label'] = label
+
             else:
                 sample = {'image': image, 'focal': focal}
 
@@ -591,8 +596,12 @@ class ToTensor(object):
         else:
             return img
 
-def parse_kitti_label_file(label_list, idx):
+def parse_kitti_label_file(label_list, idx,calib=None):
     """parse label text file into a list of numpy arrays, one for each frame"""
+    # Used to Add object Center to label dict
+    if calib!=None:
+        P2 = np.array(calib['P2']).reshape(3, 4)
+        K = P2[:3, :3]
     f = open(label_list[idx])
     line_list = []
     for line in f:
@@ -625,8 +634,38 @@ def parse_kitti_label_file(label_list, idx):
         y_pos = float(line[12])
         z_pos = float(line[13])
         det_dict["pos"] = np.array([x_pos, y_pos, z_pos])
+        if calib is not None:
+            det_dict['center_3d'] = K @ np.array([x_pos, y_pos - (height/2), z_pos]).reshape(3,1)
+            det_dict['center_3d'] = (det_dict['center_3d'][:2] / det_dict['center_3d'][2]).reshape(2,)  # (x, y) in pixels
+
         det_dict["pos_rr"] = np.array([x_pos, z_pos, -y_pos])
         det_dict["rot_y"] = float(line[14])
         det_dict_list.append(det_dict)
 
     return det_dict_list
+
+
+def parse_kitti_calibration_file(file_path, raw=False):
+    calibration_data = {}
+
+    if raw == False:
+        with open(file_path, "r") as file:
+            lines = file.readlines()
+
+            for line in lines:
+                if line.strip():  # Skip empty lines
+                    key, values = line.split(":", 1)
+                    values_list = [float(value) for value in values.split()]
+                    calibration_data[key.strip()] = values_list
+
+    else:
+        with open(file_path, "r") as file:
+            lines = file.readlines()
+
+            for line in lines[1:]:
+                if line.strip():  # Skip empty lines
+                    key, values = line.split(":", 1)
+                    values_list = [float(value) for value in values.split()]
+                    calibration_data[key.strip()] = values_list
+
+    return calibration_data

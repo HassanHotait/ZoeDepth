@@ -170,23 +170,15 @@ def rerun_log(frame_id, depth, pred, sample):
 
     label = convert_labels_to_numpy(sample['label'])
 
-    print(f'Gt depth shape: {depth.shape}, Pred depth shape: {pred.shape}, Image shape: {img.shape}')
-
 
 
 
     rr.log("/world/gt_depth", rr.Image(depth))
     rr.log("/world/pred_depth", rr.Image(pred))
     rr.log("/world/image", rr.Image(img))
-    for l in label:
-        print(f"Class: {l['class']}")
-        print(f"Class: {l['class']}")
-        print(f"Truncation: {l['truncation']}")
-        print(f"Occlusion: {l['occlusion']}")
-        print(f"Alpha: {l['alpha']}")
-        print(f"BBox2D: {l['bbox2d']}")
-        print(f"Dim: {l['dim']}")
-        print(f"Pos: {l['pos']}")
-        print(f"Pos_rr: {l['pos_rr']}")
 
     rr.log("/world/image/box2D", CustomBoxes2D(label,img,color=[255,0,0]))
+    rr.log("/world/image/center_3d",rr.Points2D(
+        positions=np.array([l['center_3d'] for l in label]),
+        colors=[[255, 0, 0] for _ in label],
+        radii=[[5] for _ in label]))

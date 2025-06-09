@@ -99,8 +99,8 @@ DATASETS_CONFIG = {
         "gt_path": "C:/Users/Hasan/OneDrive/Documents/Datasets/KITTI/data_depth_annotated/mixed",
         "labels_3d_path": r"C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\3D\training\label_2",
         "filenames_file": "./train_test_inputs/my_test_set_mini.txt",
-        "input_height": 352,
-        "input_width": 1216,  # 704
+        "input_height": 375,
+        "input_width": 1242,  # 704
         "data_path_eval": "C:/Users/Hasan/OneDrive/Documents/Datasets/KITTI/raw",
         "gt_path_eval": "C:/Users/Hasan/OneDrive/Documents/Datasets/KITTI/data_depth_annotated/mixed",
         "filenames_file_eval": "./train_test_inputs/my_test_set_mini.txt",
@@ -109,7 +109,7 @@ DATASETS_CONFIG = {
         "max_depth_eval": 80,
         "do_random_rotate": True,
         "degree": 1.0,
-        "do_kb_crop": True,
+        "do_kb_crop": False,
         "garg_crop": True,
         "eigen_crop": False,
         "use_right": False,

@@ -23,6 +23,8 @@ python evaluate.py -m zoedepth_nk -d prescan
 
 ```bash
 python online_evaluate.py -m zoedepth_nk --pretrained_resource="local::C:\Users\Hasan\shortcuts\monodepth3_checkpoints\ZoeDepthNKv1_05-Jun_20-28-f7aa0db17ecb_best.pt" -d prescan --save_preds
+python online_evaluate.py -m zoedepth_nk --pretrained_resource="local::C:\Users\Hasan\shortcuts\monodepth3_checkpoints\ZoeDepthNKv1_05-Jun_20-28-f7aa0db17ecb_best.pt" -d my_kitti_set --save_preds
+
 ```
 
 | a1    | a2    | a3    | abs_rel | rmse | log_10 | rmse_log | silog  | sq_rel |
@@ -38,9 +40,14 @@ When we train we dont start from random weights, we start from  'https://github.
 python train_mono.py -m zoedepth_nk -d prescan --pretrained_resource="url::https://github.com/isl-org/ZoeDepth/releases/download/v1.0/ZoeD_M12_NK.pt"
 ```
 
+python train_mono.py -m zoedepth_nk -d my_kitti_set --pretrained_resource="url::https://github.com/isl-org/ZoeDepth/releases/download/v1.0/ZoeD_M12_NK.pt"
+
 
 
 # Offline Eval
 
 
-python offline_evaluate.py -m zoedepth_nk -d my_kitti_set --pred_dir C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\preds_20250606_220633
+python offline_evaluate.py -m zoedepth_nk -d my_kitti_set --pred_dir C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\preds_20250609_200224
+
+
+python online_evaluate.py -m zoedepth_nk -d my_kitti_set --save_preds
