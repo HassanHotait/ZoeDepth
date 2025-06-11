@@ -43,6 +43,8 @@ import torch.utils.data.distributed
 from PIL import Image
 from torchvision.transforms import ToTensor
 
+import matplotlib.pyplot as plt
+
 
 class RunningAverage:
     def __init__(self):
@@ -93,6 +95,9 @@ class RunningAverageDict:
             return None
         return {key: value.get_value() for key, value in self._dict.items()}
     
+    def __repr__(self):
+        return repr(self.get_value())
+    
 class Metrics:
     def __init__(self):
         self._metrics = {}
@@ -119,6 +124,153 @@ class Metrics:
 
     def __repr__(self):
         return repr(self.to_dict())
+    
+# class ObjectMetrics:
+#     def __init__(self):
+#         self.obj_count = 0
+#         self.gt = []
+#         self.pred = []
+#         self.error = []
+
+#     def update(self,gt, pred, labels):
+#         if gt.shape[-2:] != pred.shape[-2:]:
+#             pred = nn.functional.interpolate(
+#                 pred, gt.shape[-2:], mode='bilinear', align_corners=True)
+#         gt = gt.squeeze().cpu().numpy()
+#         pred = pred.squeeze().cpu().numpy()
+#         assert gt.shape == pred.shape, f"GT shape {gt.shape} does not match prediction shape {pred.shape}"
+#         for l in labels:
+#             obj_center3d = l['center_3d'].squeeze().cpu().numpy()
+#             obj_center3d = np.array([int(obj_center3d[0]), int(obj_center3d[1])])
+#             try:
+#                 obj_depth = gt[obj_center3d[1], obj_center3d[0]]
+#             except:
+#                 print(f"Warning: Object center {obj_center3d} is out of bounds for the ground truth depth map of shape {gt.shape}. Skipping this object.")
+#                 continue
+#             if  obj_depth!= 0 and l['occlusion'] == 0:
+#                 self.gt.append(obj_depth)
+#                 self.pred.append(pred[obj_center3d[1], obj_center3d[0]])
+#                 self.error.append(obj_depth - pred[obj_center3d[1], obj_center3d[0]])
+#                 self.obj_count += 1
+
+#     def get_value(self):
+#         if len(self.gt) == 0 or len(self.pred) == 0:
+#             return {"absrel": None, "count": 0}
+#         gt = np.array(self.gt)
+#         pred = np.array(self.pred)
+#         absrel = np.mean(np.abs(gt - pred) / gt)
+#         return {"abs_rel": absrel, "count": self.obj_count}
+    
+#     def __repr__(self):
+#         value = self.get_value()
+#         return f"ObjectMetrics(abs_rel={value['abs_rel']:.4f}, count={value['count']})"
+
+class ObjectMetrics:
+    def __init__(self, label="MIDAS [relative] calibrated with Pointcloud gt"):
+        self.obj_count = 0
+        self.gt = []
+        self.pred = []
+        self.error = []
+        self.label = label  # plot legend label
+
+    def update(self, gt, pred, labels):
+        if gt.shape[-2:] != pred.shape[-2:]:
+            pred = nn.functional.interpolate(
+                pred, gt.shape[-2:], mode='bilinear', align_corners=True)
+        gt = gt.squeeze().cpu().numpy()
+        pred = pred.squeeze().cpu().numpy()
+        assert gt.shape == pred.shape, f"GT shape {gt.shape} does not match prediction shape {pred.shape}"
+        for l in labels:
+            obj_center3d = l['center_3d'].squeeze().cpu().numpy()
+            obj_center3d = np.array([int(obj_center3d[0]), int(obj_center3d[1])])
+            try:
+                obj_depth = gt[obj_center3d[1], obj_center3d[0]]
+            except:
+                print(f"Warning: Object center {obj_center3d} is out of bounds for the ground truth depth map of shape {gt.shape}. Skipping this object.")
+                continue
+            if obj_depth != 0 and l['occlusion'] == 0:
+                self.gt.append(obj_depth)
+                self.pred.append(pred[obj_center3d[1], obj_center3d[0]])
+                self.error.append(obj_depth - pred[obj_center3d[1], obj_center3d[0]])
+                self.obj_count += 1
+
+    def get_value(self):
+        if len(self.gt) == 0 or len(self.pred) == 0:
+            return {"abs_rel": None, "count": 0}
+        gt = np.array(self.gt)
+        pred = np.array(self.pred)
+        absrel = np.mean(np.abs(gt - pred) / gt)
+        return {"abs_rel": absrel, "count": self.obj_count}
+
+    def plot_scatter(self, color='r'):
+        if not self.gt or not self.error:
+            print("No data to plot.")
+            return
+        gt = np.array(self.gt)
+        error = np.array(self.error)
+        plt.figure()
+        plt.scatter(gt, error, c=color, label=self.label)
+        plt.xlabel('Ground Truth Depth [m]')
+        plt.ylabel('Depth Error [m]')
+        plt.title(f'Distribution of Depth Error | {len(gt)} Objects')
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+    def plot_error_bins(self, bin_size=10, color='r', save_dir=None):
+        if not self.gt or not self.error:
+            print("No data to plot.")
+            return
+        gt = np.array(self.gt)
+        error = np.array(np.abs(self.error))
+
+        bins = np.arange(0, gt.max() + bin_size, bin_size)
+        mean_errors = []
+        interval_counts = []
+
+        for i in range(len(bins) - 1):
+            start, end = bins[i], bins[i + 1]
+            indices = np.where((gt >= start) & (gt < end))[0]
+            if len(indices) > 0:
+                mean_errors.append(np.mean(error[indices]))
+                interval_counts.append(len(indices))
+            else:
+                mean_errors.append(np.nan)
+                interval_counts.append(0)
+
+        mean_errors = np.array(mean_errors)
+        interval_counts = np.array(interval_counts)
+
+        plt.figure()
+        plt.plot(bins[:-1], mean_errors, color + '-', marker='o', label=self.label)
+
+        bin_range = 10
+        for i in range(len(bins)-1):
+            if not np.isnan(mean_errors[i]):
+                plt.text(bins[i], mean_errors[i] + 0.25, f'{mean_errors[i]/bin_range:.2f}', color=color, ha='left', va='bottom')
+            bin_range += 10
+
+        xtick_labels = [f'{int(bins[i])}-{int(bins[i + 1])}m\n{interval_counts[i]} obj' for i in range(len(bins)-1)]
+        plt.xticks(bins[:-1], xtick_labels)
+        plt.xlabel('Ground Truth Depth [m]')
+        plt.ylabel('Mean Depth Error [m]')
+        plt.title(f'Mean Depth Error vs. Ground Truth Depth Range | {len(gt)} Objects\nKITTI')
+        plt.legend()
+        plt.grid()
+        plt.tight_layout()
+        plt.show()
+
+        # Optional saving
+        if save_dir:
+            np.save(f'{save_dir}/DepthBins.npy', bins)
+            np.save(f'{save_dir}/MeanErrors.npy', mean_errors)
+            np.save(f'{save_dir}/IntervalCounts.npy', interval_counts)
+            np.save(f'{save_dir}/Errors.npy', error)
+
+    def __repr__(self):
+        value = self.get_value()
+        return f"ObjectMetrics(abs_rel={value['abs_rel']:.4f}, count={value['count']})" if value['abs_rel'] is not None else "ObjectMetrics(abs_rel=None, count=0)"
+
 
 
 def colorize(value, vmin=None, vmax=None, cmap='gray_r', invalid_val=-99, invalid_mask=None, background_color=(128, 128, 128, 255), gamma_corrected=False, value_transform=None):
@@ -272,7 +424,7 @@ def compute_metrics(gt, pred, interpolate=True, garg_crop=False, eigen_crop=True
     return compute_errors(gt_depth[valid_mask], pred[valid_mask])
 
 
-def compute_metrics_object(gt, pred, interpolate=True, garg_crop=False, eigen_crop=True, dataset='nyu', min_depth_eval=0.1, max_depth_eval=10, **kwargs):
+def compute_metrics_object(gt, pred, sample,interpolate=True, garg_crop=False, eigen_crop=True, dataset='nyu', min_depth_eval=0.1, max_depth_eval=10, **kwargs):
     """Compute metrics of predicted depth maps. Applies cropping and masking as necessary or specified via arguments. Refer to compute_errors for more details on metrics.
     """
     if 'config' in kwargs:
@@ -286,13 +438,37 @@ def compute_metrics_object(gt, pred, interpolate=True, garg_crop=False, eigen_cr
         pred = nn.functional.interpolate(
             pred, gt.shape[-2:], mode='bilinear', align_corners=True)
 
+    gt = gt.squeeze().cpu().numpy()
     pred = pred.squeeze().cpu().numpy()
+
+    assert gt.shape == pred.shape, f"GT shape {gt.shape} does not match prediction shape {pred.shape}"
+    pred_obj = np.zeros_like(pred)
+    gt_obj = np.zeros_like(gt)
+    obj_count = 0
+    for l in sample['label']:
+        obj_center3d = l['center_3d'].squeeze().cpu().numpy()
+        obj_center3d = np.array([int(obj_center3d[0]), int(obj_center3d[1])])
+        try:
+            obj_depth = gt[obj_center3d[1], obj_center3d[0]]
+        except:
+            print(f"Warning: Object center {obj_center3d} is out of bounds for the ground truth depth map of shape {gt.shape}. Skipping this object.")
+            continue
+        if  obj_depth!= 0 and l['occlusion'] == 0:
+            pred_obj[obj_center3d[1], obj_center3d[0]] = pred[obj_center3d[1], obj_center3d[0]]
+            gt_obj[obj_center3d[1], obj_center3d[0]] = gt[obj_center3d[1], obj_center3d[0]]
+            obj_count += 1
+
+
+
+    gt = gt_obj
+    pred = pred_obj
+
     pred[pred < min_depth_eval] = min_depth_eval
     pred[pred > max_depth_eval] = max_depth_eval
     pred[np.isinf(pred)] = max_depth_eval
     pred[np.isnan(pred)] = min_depth_eval
 
-    gt_depth = gt.squeeze().cpu().numpy()
+    gt_depth = gt#.squeeze().cpu().numpy()
     valid_mask = np.logical_and(
         gt_depth > min_depth_eval, gt_depth < max_depth_eval)
 
@@ -315,7 +491,7 @@ def compute_metrics_object(gt, pred, interpolate=True, garg_crop=False, eigen_cr
         else:
             eval_mask = np.ones(valid_mask.shape)
     valid_mask = np.logical_and(valid_mask, eval_mask)
-    return compute_errors(gt_depth[valid_mask], pred[valid_mask])
+    return compute_errors(gt_depth[valid_mask], pred[valid_mask]), obj_count
 
 
 #################################### Model uilts ################################################

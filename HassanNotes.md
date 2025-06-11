@@ -47,7 +47,7 @@ python train_mono.py -m zoedepth_nk -d my_kitti_set --pretrained_resource="url::
 # Offline Eval
 
 
-python offline_evaluate.py -m zoedepth_nk -d my_kitti_set --pred_dir C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\preds_20250609_200224
-
+python offline_evaluate.py -m zoedepth_nk -d my_kitti_set --pred_dir C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\preds_20250611_201649
+python offline_evaluate.py -m zoedepth_nk -d my_kitti_set --pred_dir C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\preds_20250609_194436
 
 python online_evaluate.py -m zoedepth_nk -d my_kitti_set --save_preds
