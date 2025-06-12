@@ -51,3 +51,17 @@ python offline_evaluate.py -m zoedepth_nk -d my_kitti_set --pred_dir C:\Users\Ha
 python offline_evaluate.py -m zoedepth_nk -d my_kitti_set --pred_dir C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\preds_20250609_194436
 
 python online_evaluate.py -m zoedepth_nk -d my_kitti_set --save_preds
+
+
+
+
+# Most Recent (Our Checkpoint)
+python online_evaluate.py -m zoedepth_nk --pretrained_resource="local::C:\Users\Hasan\shortcuts\monodepth3_checkpoints\ZoeDepthNKv1_05-Jun_20-28-f7aa0db17ecb_best.pt" -d prescan --save_preds
+python offline_evaluate.py -m zoedepth_nk -d prescan --pred_dir C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\preds_20250612_153126
+
+# Official Checkpoint on NYU-KITTI Mix
+python online_evaluate.py -m zoedepth_nk -d prescan --save_preds
+python offline_evaluate.py -m zoedepth_nk -d prescan --pred_dir C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\preds_20250612_161556
+
+# Original Crops
+

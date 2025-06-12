@@ -186,7 +186,7 @@ class ObjectMetrics:
             try:
                 obj_depth = gt[obj_center3d[1], obj_center3d[0]]
             except:
-                print(f"Warning: Object center {obj_center3d} is out of bounds for the ground truth depth map of shape {gt.shape}. Skipping this object.")
+                print(f"Warning: Object center {tuple(obj_center3d)} is out of bounds for the ground truth depth map of shape {gt.shape}. Skipping this object.")
                 continue
             if obj_depth != 0 and l['occlusion'] == 0:
                 self.gt.append(obj_depth)

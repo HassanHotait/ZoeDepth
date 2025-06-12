@@ -1,3 +1,4 @@
+from turtle import color
 import rerun as rr
 import numpy as np
 
@@ -173,8 +174,9 @@ def rerun_log(frame_id, depth, pred, sample):
 
 
 
-    rr.log("/world/gt_depth", rr.Image(depth))
-    rr.log("/world/pred_depth", rr.Image(pred))
+    rr.log("/world/gt_depth", rr.DepthImage(depth,colormap=1))
+    # rr.log("/world/pred_depth", rr.Image(pred))
+    rr.log("/world/pred_depth", rr.DepthImage(pred,colormap=1))
     rr.log("/world/image", rr.Image(img))
 
     rr.log("/world/image/box2D", CustomBoxes2D(label,img,color=[255,0,0]))

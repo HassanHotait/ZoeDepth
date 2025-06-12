@@ -302,6 +302,15 @@ class DataLoadPreprocess(Dataset):
             files = os.listdir(self.config.labels_3d_path)
             files_path = [os.path.join(self.config.labels_3d_path, f) for f in files if f.endswith('.txt')]
             label = parse_kitti_label_file(files_path, label_id,calib=calib)
+        elif self.config.dataset == "prescan":
+            K= np.array([[880, 0, 960],[0, 733, 600],[0, 0, 1]])
+            files = os.listdir(self.config.labels_3d_path)
+            files_path = [os.path.join(self.config.labels_3d_path, f) for f in files if f.endswith('.txt')]
+            label_id = int(float(os.path.basename(sample_path.strip().split()[0])[:-4]))
+            label = parse_prescan_label_file(files_path, label_id,K=K)
+            
+
+            
 
         sample = {}
 
@@ -401,6 +410,7 @@ class DataLoadPreprocess(Dataset):
                 has_valid_depth = False
                 try:
                     depth_gt = self.reader.open(depth_path)
+                    print(depth_gt.size)
                     has_valid_depth = True
                 except IOError:
                     depth_gt = False
@@ -439,7 +449,7 @@ class DataLoadPreprocess(Dataset):
                           'image_path': sample_path.split()[0], 'depth_path': sample_path.split()[1],
                           'mask': mask}
                 
-                if self.config.dataset == "my_kitti_set":
+                if self.config.dataset == "my_kitti_set" or self.config.dataset == "prescan":
                     sample['label'] = label
 
             else:
@@ -669,3 +679,51 @@ def parse_kitti_calibration_file(file_path, raw=False):
                     calibration_data[key.strip()] = values_list
 
     return calibration_data
+
+
+def parse_prescan_label_file(label_list, idx,K=None):
+    """parse label text file into a list of numpy arrays, one for each frame"""
+    print(idx)
+    f = open(f"C:\\Users\\Hasan\\OneDrive\\Desktop\\Projects\\TestKitti\\postProcessedData\\data_5\\labels\\{str(idx).zfill(6)}.txt")
+
+    line_list = []
+    for line in f:
+        line = line.split()
+        line_list.append(line)
+
+    # each line corresponds to one detection
+    det_dict_list = []
+    for line in line_list:
+        # det_dict holds info on one detection
+        det_dict = {}
+        det_dict["track_id"] = int(line[0])
+        det_dict["prescan_class"] = str(line[1])
+        det_dict["class"] = str(line[2])
+        if det_dict["class"] == "DontCare":
+            continue
+        det_dict["truncation"] = float(line[3])
+        det_dict["occlusion"] = int(line[4])
+        det_dict["alpha"] = float(
+            line[5]
+        )  # obs angle relative to straight in front of camera
+        x_min = int(round(float(line[6])))
+        y_min = int(round(float(line[7])))
+        x_max = int(round(float(line[8])))
+        y_max = int(round(float(line[9])))
+        det_dict["bbox2d"] = np.array([x_min, y_min, x_max, y_max])
+        length = float(line[12])
+        width = float(line[11])
+        height = float(line[10])
+        det_dict["dim"] = np.array([length, width, height])
+        x_pos = float(line[13])
+        y_pos = float(line[14])
+        z_pos = float(line[15])
+        det_dict["pos"] = np.array([x_pos, y_pos, z_pos])
+        if K is not None:
+            det_dict['center_3d'] = K @ np.array([x_pos, y_pos, z_pos]).reshape(3,1)
+            det_dict['center_3d'] = (det_dict['center_3d'][:2] / det_dict['center_3d'][2]).reshape(2,)  # (x, y) in pixels
+        det_dict["pos_rr"] = np.array([x_pos, z_pos, -y_pos])
+        det_dict["rot_y"] = float(line[16])
+        det_dict_list.append(det_dict)
+
+    return det_dict_list
