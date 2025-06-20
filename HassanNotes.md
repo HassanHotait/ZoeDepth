@@ -1,3 +1,11 @@
+# Environment Setup VENV
+
+```bash
+python -m venv env/venv_zoe
+```
+
+
+
 # Evaluate on KITTI
 
 ```bash

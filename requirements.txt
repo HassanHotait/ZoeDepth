@@ -1,0 +1,12 @@
+h5py==3.7.0
+matplotlib==3.6.2
+numpy==1.24.1
+opencv-python==4.6.0.66
+scipy==1.10.0
+torch==1.13.1+cu117
+torchaudio==0.13.1+cu117
+torchvision==0.14.1+cu117
+huggingface-hub==0.11.1
+timm==0.6.12
+tqdm==4.64.1
+wandb==0.13.9
