@@ -4,12 +4,16 @@
 python -m venv env/venv_zoe
 ```
 
+```bash
+pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu117
+```
+
 
 
 # Evaluate on KITTI
 
 ```bash
-python evaluate.py -m zoedepth_nk -d kitti_test
+python online_evaluate.py -m zoedepth_nk -d kitti_test --save_preds
 ```
 
 | a1   | a2   | a3   | abs_rel | rmse  | log_10 | rmse_log | silog | sq_rel |
@@ -19,7 +23,7 @@ python evaluate.py -m zoedepth_nk -d kitti_test
 # Evaluate on Prescan
 
 ```bash
-python evaluate.py -m zoedepth_nk -d prescan
+python online_evaluate.py -m zoedepth_nk -d prescan --save_preds
 ```
 
 | a1    | a2    | a3    | abs_rel | rmse  | log_10 | rmse_log | silog  | sq_rel |
@@ -56,7 +60,7 @@ python train_mono.py -m zoedepth_nk -d my_kitti_set --pretrained_resource="url::
 
 
 python offline_evaluate.py -m zoedepth_nk -d my_kitti_set --pred_dir C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\preds_20250611_201649
-python offline_evaluate.py -m zoedepth_nk -d my_kitti_set --pred_dir C:\Users\Hasan\OneDrive\Documents\Datasets\KITTI\preds_20250609_194436
+python offline_evaluate.py -m zoedepth_nk -d prescan --pred_dir C:\Users\Hasan\OneDrive\Desktop\Projects\ZoeDepth\postProcessedData\preds_20250623_233107
 
 python online_evaluate.py -m zoedepth_nk -d my_kitti_set --save_preds
 

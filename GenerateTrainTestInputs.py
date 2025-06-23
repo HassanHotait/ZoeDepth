@@ -2,9 +2,9 @@ import os
 import random
 
 # Define directories
-img_directory = r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\data_5\images"
-depth_directory = r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\data_5\depthMap"
-output_dir = r"C:\Users\Hasan\OneDrive\Desktop\Projects\TestKitti\postProcessedData\data_5\train_test_inputs"
+img_directory = r"C:\Users\Hasan\OneDrive\Desktop\Projects\ZoeDepth\postProcessedData\data_5\images"
+depth_directory = r"C:\Users\Hasan\OneDrive\Desktop\Projects\ZoeDepth\postProcessedData\data_5\depthMap"
+output_dir = r"C:\Users\Hasan\OneDrive\Desktop\Projects\ZoeDepth\postProcessedData\data_5\train_test_inputs"
 
 # Create output directory if it doesn't exist
 os.makedirs(output_dir, exist_ok=True)

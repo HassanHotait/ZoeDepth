@@ -307,7 +307,7 @@ class DataLoadPreprocess(Dataset):
             files = os.listdir(self.config.labels_3d_path)
             files_path = [os.path.join(self.config.labels_3d_path, f) for f in files if f.endswith('.txt')]
             label_id = int(float(os.path.basename(sample_path.strip().split()[0])[:-4]))
-            label = parse_prescan_label_file(files_path, label_id,K=K)
+            label = parse_prescan_label_file(self.config.labels_3d_path, label_id,K=K)
             
 
             
@@ -408,9 +408,12 @@ class DataLoadPreprocess(Dataset):
                 depth_path = os.path.join(
                     gt_path, remove_leading_slash(sample_path.split()[1]))
                 has_valid_depth = False
+
+                
                 try:
                     depth_gt = self.reader.open(depth_path)
-                    print(depth_gt.size)
+                    depth_gt = cv2.resize(np.asarray(depth_gt, dtype=np.float32), (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
+                    assert image.shape ==  depth_gt.shape, f"Image shape {image.shape} does not match depth shape {depth_gt.shape}"
                     has_valid_depth = True
                 except IOError:
                     depth_gt = False
@@ -681,10 +684,9 @@ def parse_kitti_calibration_file(file_path, raw=False):
     return calibration_data
 
 
-def parse_prescan_label_file(label_list, idx,K=None):
+def parse_prescan_label_file(label_path, idx,K=None):
     """parse label text file into a list of numpy arrays, one for each frame"""
-    print(idx)
-    f = open(f"C:\\Users\\Hasan\\OneDrive\\Desktop\\Projects\\TestKitti\\postProcessedData\\data_5\\labels\\{str(idx).zfill(6)}.txt")
+    f = open(f"{label_path}\\{str(idx).zfill(6)}.txt")
 
     line_list = []
     for line in f:
