@@ -415,7 +415,9 @@ def get_config(model_name, mode='train', dataset=None, **overwrite_kwargs):
     """
 
 
-    check_choices("Model", model_name, ["zoedepth", "zoedepth_nk"])
+    check_choices("Model", model_name, ["zoedepth", "zoedepth_nk","midas"])
+    if model_name == "midas":
+        overwrite_kwargs['version_name'] = "DPT_BEiT_L_512"
     check_choices("Mode", mode, ["train", "infer", "eval"])
     if mode == "train":
         check_choices("Dataset", dataset, ["nyu", "kitti", "mix", "prescan",None])
@@ -424,7 +426,10 @@ def get_config(model_name, mode='train', dataset=None, **overwrite_kwargs):
     config = update_model_config(config, mode, model_name)
 
     # update with model version specific config
-    version_name = overwrite_kwargs.get("version_name", config["version_name"])
+    try:
+        version_name = overwrite_kwargs.get("version_name", config["version_name"])
+    except:
+        version_name = overwrite_kwargs.get("version_name")
     config = update_model_config(config, mode, model_name, version_name)
 
     # update with config version if specified

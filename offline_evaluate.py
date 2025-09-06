@@ -69,7 +69,7 @@ def infer(model, images, **kwargs):
 
 
 def evaluate_offline(pred_dir, test_loader, config, round_vals=True, round_precision=3):
-    metrics = Metrics()
+    metrics = RunningAverageDict()
     metrics_obj = ObjectMetrics()
     for i, sample in tqdm(enumerate(test_loader), total=len(test_loader)):
         if 'has_valid_depth' in sample:
@@ -83,9 +83,11 @@ def evaluate_offline(pred_dir, test_loader, config, round_vals=True, round_preci
         if not os.path.exists(pred_path):
             print(f"Missing prediction: {pred_path}")
             continue
+        # For both ZoeDepth & MiDAS the saved pred is in meters (For midas we only save after computing scale and shift w.r.t GT)
         pred = torch.from_numpy(np.load(pred_path)).cuda()
-        metrics['pixel'].update(compute_metrics(depth, pred, config=config))
-        metrics_obj.update(depth, pred, sample['label'])
+        step_metrics, _ = compute_metrics(depth, pred, config=config,metric_eval=True)
+        metrics.update(step_metrics)
+        # metrics_obj.update(depth, pred, sample['label'])
         # object_metrics_update, valid_obj = compute_metrics_object(depth, pred, sample, config=config)
         # obj_count += valid_obj
         # metrics['object'].update(object_metrics_update)

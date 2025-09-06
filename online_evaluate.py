@@ -27,6 +27,7 @@ import os
 from pprint import pprint
 
 import torch
+from zoedepth.models.base_models.midas import MidasCore
 from zoedepth.utils.easydict import EasyDict as edict
 from tqdm import tqdm
 from datetime import datetime
@@ -54,21 +55,26 @@ def infer(model, images, **kwargs):
         else:
             raise NotImplementedError(f"Unknown output type {type(pred)}")
         return pred
+    
+    if type(model) != MidasCore:
+        pred1 = model(images, **kwargs)
+        pred1 = get_depth_from_prediction(pred1)
 
-    pred1 = model(images, **kwargs)
-    pred1 = get_depth_from_prediction(pred1)
+        pred2 = model(torch.flip(images, [3]), **kwargs)
+        pred2 = get_depth_from_prediction(pred2)
+        pred2 = torch.flip(pred2, [3])
 
-    pred2 = model(torch.flip(images, [3]), **kwargs)
-    pred2 = get_depth_from_prediction(pred2)
-    pred2 = torch.flip(pred2, [3])
+        pred = 0.5 * (pred1 + pred2)
+    else:
+        pred = model(images).unsqueeze(0)
+        # pred = 255 * (pred - pred.min()) / (pred.max() - pred.min()) 
 
-    mean_pred = 0.5 * (pred1 + pred2)
 
-    return mean_pred
+    return pred
 
 
 @torch.no_grad()
-def evaluate(model, test_loader, config, round_vals=True, round_precision=3):
+def evaluate(model, test_loader, config, round_vals=True, round_precision=3,metric_eval=True):
     model.eval()
     metrics = RunningAverageDict()
     for i, sample in tqdm(enumerate(test_loader), total=len(test_loader)):
@@ -85,24 +91,27 @@ def evaluate(model, test_loader, config, round_vals=True, round_precision=3):
 
         # Save image, depth, pred for visualization
         if config.save_preds_arrays or config.save_preds_images:
-            # print("Saving images ...")
-            np.save(os.path.join(config.save_preds_arrays, f"{str(i).zfill(6)}.npy"), pred.cpu().numpy())  # Save pred as numpy array
+
             from PIL import Image
             import torchvision.transforms as transforms
             from zoedepth.utils.misc import colorize
 
             # def save_image(img, path):
-            d = colorize(depth.squeeze().cpu().numpy(), 0, 10)
-            # p = colorize(pred.squeeze().cpu().numpy(), 0, 10)
+            d = colorize(depth.squeeze().cpu().numpy(), 0, 80)
+            p = colorize(pred.squeeze().cpu().numpy(), 0, 80)
+            # np.save(os.path.join(config.save_preds_arrays, f"{str(i).zfill(6)}.npy"), p)
             # im = transforms.ToPILImage()(image.squeeze().cpu())
-            Image.fromarray(d).save(os.path.join(config.save_preds_images, f"{str(i).zfill(6)}.png"))
-            # Image.fromarray(p).save(os.path.join(config.save_images, f"{i}_pred.png"))
+            Image.fromarray(d).save(os.path.join(config.save_preds_images, f"{str(i).zfill(6)}_gt.png"))
+            Image.fromarray(p).save(os.path.join(config.save_preds_images, f"{str(i).zfill(6)}_pred.png"))
 
 
 
         # print(depth.shape, pred.shape)
         # print(f'Gt Depth shape: {depth.shape}, Pred Depth shape: {pred.shape}')
-        metrics.update(compute_metrics(depth, pred, config=config))
+        step_metrics, metric_depth = compute_metrics(depth, pred, config=config,metric_eval=metric_eval)
+        np.save(os.path.join(config.save_preds_arrays, f"{str(i).zfill(6)}.npy"), metric_depth)  # Save pred as numpy array
+
+        metrics.update(step_metrics)
 
     if round_vals:
         def r(m): return round(m, round_precision)
@@ -112,10 +121,19 @@ def evaluate(model, test_loader, config, round_vals=True, round_precision=3):
     return metrics
 
 def main(config):
-    model = build_model(config)
+    if config['model'] in ['zoedepth','zoedepth_nk']:
+        model = build_model(config)
+        metric_eval = True
+    elif config['model'] == 'midas':
+        version_name = "DPT_BEiT_L_512" # (highest accuracy, slowest inference speed)
+        model = MidasCore.build(midas_model_type=version_name)
+        metric_eval = False
+          
+    else:
+        raise NotImplementedError(f"Model {config['model']} not supported.")
     test_loader = DepthDataLoader(config, 'online_eval').data
     model = model.cuda()
-    metrics = evaluate(model, test_loader, config)
+    metrics = evaluate(model, test_loader, config,metric_eval=metric_eval)
     print(f"{colors.fg.green}")
     print(metrics)
     print(f"{colors.reset}")

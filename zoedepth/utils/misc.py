@@ -335,8 +335,50 @@ def count_parameters(model, include_all=False):
     return sum(p.numel() for p in model.parameters() if p.requires_grad or include_all)
 
 
-def compute_errors(gt, pred):
+def compute_scale_and_shift(prediction, target, mask):
+    """Compute scale and shift to align prediction with target using least squares.
+    
+    Args:
+        prediction (numpy.ndarray): Predicted values
+        target (numpy.ndarray): Target values  
+        mask (numpy.ndarray): Valid mask
+        
+    Returns:
+        tuple: (scale, shift) values
+    """
+    # Convert to flattened arrays for easier computation
+    pred_masked = prediction[mask]
+    target_masked = target[mask]
+    
+    if len(pred_masked) == 0:
+        return 1.0, 0.0
+    
+    # system matrix: A = [[a_00, a_01], [a_10, a_11]]
+    a_00 = np.sum(pred_masked * pred_masked)
+    a_01 = np.sum(pred_masked)
+    a_11 = np.sum(mask)
+    
+    # right hand side: b = [b_0, b_1]
+    b_0 = np.sum(pred_masked * target_masked)
+    b_1 = np.sum(target_masked)
+    
+    # solution: x = A^-1 . b
+    det = a_00 * a_11 - a_01 * a_01
+    
+    if det <= 0:
+        return 1.0, 0.0
+    
+    scale = (a_11 * b_0 - a_01 * b_1) / det
+    shift = (-a_01 * b_0 + a_00 * b_1) / det
+    
+    return scale, shift
+
+
+def compute_errors(gt, pred, max_depth_eval=10.0):
     """Compute metrics for 'pred' compared to 'gt'
+
+    Here we assume the inputs are both metric, even if we are evaluating MIDAS relative depth.
+    In that case, the caller should have already aligned, capped, and inverted the predictions.
 
     Args:
         gt (numpy.ndarray): Ground truth values
@@ -378,7 +420,7 @@ def compute_errors(gt, pred):
                 silog=silog, sq_rel=sq_rel)
 
 
-def compute_metrics(gt, pred, interpolate=True, garg_crop=False, eigen_crop=True, dataset='nyu', min_depth_eval=0.1, max_depth_eval=10, **kwargs):
+def compute_metrics(gt, pred, interpolate=True, dataset='nyu', metric_eval=True, **kwargs):
     """Compute metrics of predicted depth maps. Applies cropping and masking as necessary or specified via arguments. Refer to compute_errors for more details on metrics.
     """
     if 'config' in kwargs:
@@ -387,20 +429,34 @@ def compute_metrics(gt, pred, interpolate=True, garg_crop=False, eigen_crop=True
         eigen_crop = config.eigen_crop
         min_depth_eval = config.min_depth_eval
         max_depth_eval = config.max_depth_eval
+        # print(f"Using config settings for evaluation: garg_crop={garg_crop}, eigen_crop={eigen_crop}, min_depth_eval={min_depth_eval}, max_depth_eval={max_depth_eval}")
+        # # if hasattr(config, 'metric_eval'):
+        #     metric_eval = config.metric_eval
 
     if gt.shape[-2:] != pred.shape[-2:] and interpolate:
         pred = nn.functional.interpolate(
             pred, gt.shape[-2:], mode='bilinear', align_corners=True)
 
     pred = pred.squeeze().cpu().numpy()
+    gt_depth = gt.squeeze().cpu().numpy()
+    # If relative depth evaluation, treat pred as disparity, align, cap, and invert
+    if not metric_eval:
+        valid_mask = (gt_depth > 0) & (pred > 0) & np.isfinite(gt_depth) & np.isfinite(pred)
+        target_disparity = np.zeros_like(gt_depth)
+        target_disparity[valid_mask] = 1.0 / gt_depth[valid_mask]
+        scale, shift = compute_scale_and_shift(pred, target_disparity, valid_mask)
+        pred_aligned = scale * pred + shift
+        depth_cap = max_depth_eval
+        disparity_cap = 1.0 / depth_cap
+        pred_aligned[pred_aligned < disparity_cap] = disparity_cap
+        pred = 1.0 / pred_aligned
+
     pred[pred < min_depth_eval] = min_depth_eval
     pred[pred > max_depth_eval] = max_depth_eval
     pred[np.isinf(pred)] = max_depth_eval
     pred[np.isnan(pred)] = min_depth_eval
 
-    gt_depth = gt.squeeze().cpu().numpy()
-    valid_mask = np.logical_and(
-        gt_depth > min_depth_eval, gt_depth < max_depth_eval)
+    valid_mask = np.logical_and(gt_depth > min_depth_eval, gt_depth < max_depth_eval)
 
     if garg_crop or eigen_crop:
         gt_height, gt_width = gt_depth.shape
@@ -421,7 +477,7 @@ def compute_metrics(gt, pred, interpolate=True, garg_crop=False, eigen_crop=True
         else:
             eval_mask = np.ones(valid_mask.shape)
     valid_mask = np.logical_and(valid_mask, eval_mask)
-    return compute_errors(gt_depth[valid_mask], pred[valid_mask])
+    return compute_errors(gt_depth[valid_mask], pred[valid_mask], max_depth_eval=max_depth_eval), pred
 
 
 def compute_metrics_object(gt, pred, sample,interpolate=True, garg_crop=False, eigen_crop=True, dataset='nyu', min_depth_eval=0.1, max_depth_eval=10, **kwargs):
@@ -453,24 +509,33 @@ def compute_metrics_object(gt, pred, sample,interpolate=True, garg_crop=False, e
         except:
             print(f"Warning: Object center {obj_center3d} is out of bounds for the ground truth depth map of shape {gt.shape}. Skipping this object.")
             continue
-        if  obj_depth!= 0 and l['occlusion'] == 0:
+        if obj_depth != 0 and l['occlusion'] == 0:
             pred_obj[obj_center3d[1], obj_center3d[0]] = pred[obj_center3d[1], obj_center3d[0]]
             gt_obj[obj_center3d[1], obj_center3d[0]] = gt[obj_center3d[1], obj_center3d[0]]
             obj_count += 1
 
-
-
     gt = gt_obj
     pred = pred_obj
+
+    # If relative depth evaluation, treat pred as disparity, align, cap, and invert
+    metric_eval = kwargs.get('metric_eval', True)
+    if metric_eval is False:
+        valid_mask = (gt > 0) & (pred > 0) & np.isfinite(gt) & np.isfinite(pred)
+        target_disparity = np.zeros_like(gt)
+        target_disparity[valid_mask] = 1.0 / gt[valid_mask]
+        scale, shift = compute_scale_and_shift(pred, target_disparity, valid_mask)
+        pred_aligned = scale * pred + shift
+        disparity_cap = 1.0 / max_depth_eval
+        pred_aligned[pred_aligned < disparity_cap] = disparity_cap
+        pred = 1.0 / pred_aligned
 
     pred[pred < min_depth_eval] = min_depth_eval
     pred[pred > max_depth_eval] = max_depth_eval
     pred[np.isinf(pred)] = max_depth_eval
     pred[np.isnan(pred)] = min_depth_eval
 
-    gt_depth = gt#.squeeze().cpu().numpy()
-    valid_mask = np.logical_and(
-        gt_depth > min_depth_eval, gt_depth < max_depth_eval)
+    gt_depth = gt
+    valid_mask = np.logical_and(gt_depth > min_depth_eval, gt_depth < max_depth_eval)
 
     if garg_crop or eigen_crop:
         gt_height, gt_width = gt_depth.shape
@@ -491,7 +556,7 @@ def compute_metrics_object(gt, pred, sample,interpolate=True, garg_crop=False, e
         else:
             eval_mask = np.ones(valid_mask.shape)
     valid_mask = np.logical_and(valid_mask, eval_mask)
-    return compute_errors(gt_depth[valid_mask], pred[valid_mask]), obj_count
+    return compute_errors(gt_depth[valid_mask], pred[valid_mask], metric_eval=metric_eval, max_depth_eval=max_depth_eval), obj_count
 
 
 #################################### Model uilts ################################################
